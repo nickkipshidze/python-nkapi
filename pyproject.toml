@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nkapi"
+version = "25.11.18a"
+description = "A lightweight general purpose API framework. Designed to make getting started quick and easy."
+keywords = ["nkapi", "kapi", "flask", "django", "api framework"]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICEN[CS]E.*"]
+authors = [
+    { name = "Nick Kipshidze", email = "kipshidze.nick@gmail.com" }
+]
+maintainers = [
+    { name = "Nick Kipshidze", email = "kipshidze.nick@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python"
+]
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://github.com/nickkipshidze/python-nkapi"
+Repository = "https://github.com/nickkipshidze/python-nkapi"
+Issues = "https://github.com/nickkipshidze/python-nkapi/issues"
