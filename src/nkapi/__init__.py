@@ -1,43 +1,64 @@
-import os
-import sys
 import json
 import datetime
 import traceback
 import http.server
 import urllib.parse
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 class NKResponse:
-    def __init__(self, headers={}, data="", status=200):
-        self.headers = headers
+    def __init__(self, headers=None, data="", status=200):
+        self.headers = headers or {}
         self.data = data
         self.status = status
 
-        if "Content-Type" in headers and headers["Content-Type"] == "application/json" and type(data) == dict:
+        if self.headers.get("Content-Type") == "application/json" and isinstance(self.data, dict):
             self.data = json.dumps(self.data)
 
-        self.headers["Content-Length"] = len(self.data.encode("utf-8"))
+        if isinstance(self.data, str):
+            self.data = self.data.encode("utf-8")
+        
+        self.headers["Content-Length"] = len(self.data)
 
 class NKRequest:
-    def __init__(self, handler: http.server.BaseHTTPRequestHandler, body=None):
-        self.method = handler.command
-        self.raw_path = handler.path
-        
-        parsed = urllib.parse.urlparse(handler.path)
-        self.path = parsed.path
-        self.query = urllib.parse.parse_qs(parsed.query)
-
-        self.headers = dict(handler.headers)
+    def __init__(self, method, path, query=None, headers=None, body=None, client_address=None):
+        self.method = method
+        self.path = path
+        self.query = query or {}
+        self.headers = headers or {}
         self.body = body
-        self.client_address = handler.client_address
-        self.handler = handler
+        self.client_address = client_address
+        self.raw_path = path
 
-        if "Content-Type" in self.headers and self.headers["Content-Type"] == "application/json" and type(self.body) == str:
+        if self.headers.get("Content-Type") == "application/json" and isinstance(self.body, str):
             try:
                 self.body = json.loads(self.body)
             except json.decoder.JSONDecodeError:
                 print("* Warning: Couldn't decode json in the request body.")
+
+    @classmethod
+    def from_environ(cls, environ):
+        method = environ.get("REQUEST_METHOD", "GET")
+        path = environ.get("PATH_INFO", "/")
+        query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
+
+        headers = {}
+        for key, value in environ.items():
+            if key.startswith("HTTP_"):
+                header_name = key[5:].replace("_", "-").title()
+                headers[header_name] = value
+            elif key in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+                header_name = key.replace("_", "-").title()
+                headers[header_name] = value
+
+        try:
+            length = int(environ.get("CONTENT_LENGTH", 0))
+        except (ValueError, TypeError):
+            length = 0
+        body = environ["wsgi.input"].read(length).decode("utf-8") if length > 0 else None
+
+        client_address = (environ.get("REMOTE_ADDR", ""), environ.get("REMOTE_PORT", 0))
+        return cls(method, path, query, headers, body, client_address)
 
     def __str__(self):
         return f"<nkapi.NKRequest - \"{self.method} {self.path}\">"
@@ -51,19 +72,32 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
     def __init__(self, router, *args, **kwargs):
         self.router = router
         super().__init__(*args, **kwargs)
-        
-    def do_GET(self):
-        request = NKRequest(handler=self, body=None)
-        response = self.router.handle(request)
-        self.respond(response)
 
-    def do_POST(self):
+    def handle_request(self):
         length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8")
-        request = NKRequest(handler=self, body=body)
+        body = self.rfile.read(length).decode("utf-8") if length > 0 else None
+
+        parsed = urllib.parse.urlparse(self.path)
+
+        request = NKRequest(
+            method=self.command,
+            path=parsed.path,
+            query=urllib.parse.parse_qs(parsed.query),
+            headers=dict(self.headers),
+            body=body
+        )
+
         response = self.router.handle(request)
         self.respond(response)
     
+    def do_GET(self): self.handle_request()
+    def do_POST(self): self.handle_request()
+    def do_PUT(self): self.handle_request()
+    def do_DELETE(self): self.handle_request()
+    def do_PATCH(self): self.handle_request()
+    def do_OPTIONS(self): self.handle_request()
+    def do_HEAD(self): self.handle_request()
+
     def respond(self, response: NKResponse):
         self.send_response(response.status)
         
@@ -71,7 +105,7 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_header(header, value)
         self.end_headers()
 
-        self.wfile.write(response.data.encode("utf-8"))
+        self.wfile.write(response.data)
     
     def log_message(self, format, *args):
         timestamp = datetime.datetime.now().strftime("%I:%M:%S %p %m/%d/%Y")
@@ -83,10 +117,10 @@ class NKRouter:
     
     def register(self, methods, path, callback):
         for method in methods:
-            self.routes[(method, path)] = callback
+            self.routes[(method.upper(), path)] = callback
     
     def handle(self, request: NKRequest):
-        handler = self.routes.get((request.method, request.path))
+        handler = self.routes.get((request.method.upper(), request.path))
 
         if handler != None:
             try:
@@ -104,17 +138,19 @@ class NKServer:
         self.debug = bool(debug)
 
         self.router = NKRouter()
-        self.handler = self.make_handler(self.router)
+        self.handler = lambda *args, **kwargs: NKRequestHandler(self.router, *args, **kwargs)
 
-        self.httpd = http.server.HTTPServer(
-            (self.host, self.port),
-            self.handler
-        )
+    @property
+    def wsgi_app(self):
+        def app(environ, start_response):
+            request = NKRequest.from_environ(environ)
+            response = self.router.handle(request)
 
-    def make_handler(self, router):
-        def handler(*args, **kwargs):
-            NKRequestHandler(router, *args, **kwargs)
-        return handler
+            status_line = f"{response.status} {http.client.responses.get(response.status, "")}"
+            headers = [(k, str(v)) for k, v in response.headers.items()]
+            start_response(status_line, headers)
+            return [response.data.encode("utf-8")]
+        return app
 
     def start(self):
         print(
@@ -122,6 +158,11 @@ class NKServer:
             f"* Debug mode: {self.debug}",
             f"* Running on http://{self.host}:{self.port}/",
             sep="\n"
+        )
+
+        self.httpd = http.server.HTTPServer(
+            (self.host, self.port),
+            self.handler
         )
 
         try:
