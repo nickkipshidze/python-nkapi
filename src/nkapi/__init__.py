@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import datetime
+import traceback
 import http.server
 import urllib.parse
 
@@ -31,6 +32,12 @@ class NKRequest:
         self.body = body
         self.client_address = handler.client_address
         self.handler = handler
+
+        if "Content-Type" in self.headers and self.headers["Content-Type"] == "application/json" and type(self.body) == str:
+            try:
+                self.body = json.loads(self.body)
+            except json.decoder.JSONDecodeError:
+                print("* Warning: Couldn't decode json in the request body.")
 
     def __str__(self):
         return f"<nkapi.NKRequest - \"{self.method} {self.path}\">"
@@ -74,17 +81,24 @@ class NKRouter:
     def __init__(self):
         self.routes = {}
     
-    def register(self, method, path, callback):
-        self.routes[(method, path)] = callback
+    def register(self, methods, path, callback):
+        for method in methods:
+            self.routes[(method, path)] = callback
     
     def handle(self, request: NKRequest):
         handler = self.routes.get((request.method, request.path))
-        if handler:
-            return handler(request)
-        return NKResponse(status=404)
+
+        if handler != None:
+            try:
+                return handler(request)
+            except Exception as error:
+                traceback.print_exception(error)
+                return NKResponse(data="500 Internal Server Error", status=500)
+            
+        return NKResponse(data="404 Not Found", status=404)
 
 class NKServer:
-    def __init__(self, host="localhost", port=8000, debug=True):
+    def __init__(self, host="127.0.0.1", port=8000, debug=True):
         self.host = host
         self.port = port
         self.debug = bool(debug)
@@ -110,4 +124,9 @@ class NKServer:
             sep="\n"
         )
 
-        self.httpd.serve_forever()
+        try:
+            self.httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("* Closing the server...")
+            self.httpd.server_close()
+            exit(0)
