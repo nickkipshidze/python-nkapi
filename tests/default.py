@@ -5,6 +5,8 @@ server = nkapi.NKServer(
     port=8000
 )
 
+app = server.wsgi_app
+
 def root(request: nkapi.NKRequest):
     return nkapi.NKResponse(
         headers={"Content-Type": "application/json"},
@@ -23,4 +25,5 @@ server.router.register(
     callback=root
 )
 
-server.start()
+if __name__ == "__main__":
+    server.start()
