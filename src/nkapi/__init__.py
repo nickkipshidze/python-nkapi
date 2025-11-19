@@ -6,7 +6,7 @@ import traceback
 import http.server
 import urllib.parse
 
-__version__ = "25.11.18a"
+__version__ = "0.1.0"
 
 class NKResponse:
     def __init__(self, headers={}, data="", status=200):
