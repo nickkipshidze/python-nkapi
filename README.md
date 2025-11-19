@@ -31,13 +31,13 @@ Here’s a minimal example of using NKAPI:
 ```python
 import nkapi
 
-server = nkapi.NKServer(host="0.0.0.0", port=8000)
+server = nkapi.NKServer(host="127.0.0.1", port=8000)
 
 def root(request):
     return nkapi.NKResponse(
         headers={"Content-Type": "application/json"},
         data={
-            "method": request.method,
+            "methods": request.methods,
             "path": request.path,
             "query": request.query,
             "headers": request.headers,
@@ -45,11 +45,11 @@ def root(request):
         }
     )
 
-server.router.register(method="GET", path="/", callback=root)
+server.router.register(methods=["GET"], path="/", callback=root)
 server.start()
 ```
 
-Start the server and visit `http://localhost:8000/` in your browser. You will see a JSON response containing the request details.
+Start the server and visit `http://127.0.0.1:8000/` in your browser. You will see a JSON response containing the request details.
 
 ---
 
@@ -84,10 +84,10 @@ Handles request routing.
 **Register routes:**
 
 ```python
-server.router.register(method="GET", path="/", callback=some_function)
+server.router.register(methods=["GET"], path="/", callback=some_function)
 ```
 
-- `method`: HTTP method (`GET`, `POST`, etc.)  
+- `methods`: HTTP methods (`GET`, `POST`, etc.)  
 - `path`: URL path to match  
 - `callback`: Function that receives an `NKRequest` object and returns an `NKResponse`
 
@@ -150,7 +150,7 @@ Internal class used by NKServer to handle incoming HTTP requests. You typically 
 **GET request:**
 
 ```python
-server.router.register("GET", "/hello", lambda req: nkapi.NKResponse(data="Hello!"))
+server.router.register(["GET"], "/hello", lambda req: nkapi.NKResponse(data="Hello!"))
 ```
 
 **POST request:**
@@ -159,12 +159,16 @@ server.router.register("GET", "/hello", lambda req: nkapi.NKResponse(data="Hello
 def echo(request):
     return nkapi.NKResponse(data=request.body)
 
-server.router.register("POST", "/echo", echo)
+server.router.register(["POST"], "/echo", echo)
 ```
 
 **404 Handling:**
 
 If a route is not found, NKAPI automatically returns a `404` response.
+
+**500 Handling:**
+
+If an error occurs in a callback, NKAPI automatically returns a `500` response.
 
 ---
 
