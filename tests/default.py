@@ -5,7 +5,7 @@ server = nkapi.NKServer(
     port=8000
 )
 
-def root(request):
+def root(request: nkapi.NKRequest):
     return nkapi.NKResponse(
         headers={"Content-Type": "application/json"},
         data={
@@ -18,7 +18,7 @@ def root(request):
     )
 
 server.router.register(
-    method="GET",
+    methods=["GET", "POST"],
     path="/",
     callback=root
 )
