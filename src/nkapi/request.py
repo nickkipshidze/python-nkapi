@@ -5,24 +5,36 @@ class NKRequest:
     def __init__(self, method, path, query=None, headers=None, body=None, client_address=None):
         self.method = method
         self.path = path
-        self.query = query or {}
+        query = query or {}
+        self.query = {k: v[0] if len(v) == 1 else v for k, v in query.items()}
+        self.params = {}
         self.headers = headers or {}
         self.body = body
         self.client_address = client_address
-        self.raw_path = path
 
-        if self.headers.get("Content-Type") == "application/json" and isinstance(self.body, str):
+        if "application/json" in self.headers.get("Content-Type", "").lower() and isinstance(self.body, str):
             try:
                 self.body = json.loads(self.body)
             except json.decoder.JSONDecodeError:
                 print("* Warning: Couldn't decode json in the request body.")
+                
+    @classmethod
+    def from_handler(cls, handler):
+        length = int(handler.headers.get("Content-Length", 0))
+        body = handler.rfile.read(length).decode("utf-8") if length > 0 else None
+        parsed = urllib.parse.urlparse(handler.path)
+        
+        return cls(
+            method=handler.command,
+            path=parsed.path,
+            query=urllib.parse.parse_qs(parsed.query),
+            headers=dict(handler.headers),
+            body=body,
+            client_address=handler.client_address
+        )
 
     @classmethod
     def from_environ(cls, environ):
-        method = environ.get("REQUEST_METHOD", "GET")
-        path = environ.get("PATH_INFO", "/")
-        query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
-
         headers = {}
         for key, value in environ.items():
             if key.startswith("HTTP_"):
@@ -38,8 +50,14 @@ class NKRequest:
             length = 0
         body = environ["wsgi.input"].read(length).decode("utf-8") if length > 0 else None
 
-        client_address = (environ.get("REMOTE_ADDR", ""), environ.get("REMOTE_PORT", 0))
-        return cls(method, path, query, headers, body, client_address)
+        return cls(
+            method=environ.get("REQUEST_METHOD", "GET"),
+            path=environ.get("PATH_INFO", "/"),
+            query=urllib.parse.parse_qs(environ.get("QUERY_STRING", "")),
+            headers=headers,
+            body=body,
+            client_address=(environ.get("REMOTE_ADDR", ""), environ.get("REMOTE_PORT", 0))
+        )
 
     def __str__(self):
         return f"<nkapi.NKRequest - \"{self.method} {self.path}\">"
