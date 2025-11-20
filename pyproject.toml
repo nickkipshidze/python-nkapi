@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nkapi"
-version = "0.1.1"
+version = "0.1.2"
 description = "A lightweight general purpose API framework. Designed to make getting started quick and easy."
 keywords = ["nkapi", "kapi", "flask", "django", "api framework"]
 readme = "README.md"
