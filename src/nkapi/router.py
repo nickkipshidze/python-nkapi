@@ -3,22 +3,72 @@ import traceback
 from .request import NKRequest
 from .response import NKResponse
 
+class RouteNode:
+    def __init__(self):
+        self.children = {}
+        self.handler = None
+        self.param_name = None
+
 class NKRouter:
     def __init__(self):
         self.routes = {}
     
     def register(self, methods, path, callback):
+        parts = path.strip("/").split("/")
         for method in methods:
-            self.routes[(method.upper(), path)] = callback
-    
-    def handle(self, request: NKRequest):
-        handler = self.routes.get((request.method.upper(), request.path))
+            method = method.upper()
+            if method not in self.routes:
+                self.routes[method] = RouteNode()
+            node: RouteNode = self.routes[method]
 
-        if handler != None:
+            for part in parts:
+                if part.startswith("<") and part.endswith(">"):
+                    key = "<param>"
+                    param_name = part[1:-1]
+                    if key not in node.children:
+                        node.children[key] = RouteNode()
+                    node = node.children[key]
+                    node.param_name = param_name
+                else:
+                    if part not in node.children:
+                        node.children[part] = RouteNode()
+                    node = node.children[part]
+
+            node.handler = callback
+
+    def _match(self, node: RouteNode, parts, params):
+        if not parts:
+            return (node.handler, params) if node.handler else (None, {})
+        
+        part = parts[0]
+        if part in node.children:
+            handler, p = self._match(node.children[part], parts[1:], params.copy())
+            if handler:
+                return handler, p
+            
+        if "<param>" in node.children:
+            child = node.children["<param>"]
+            new_params = params.copy()
+            new_params[child.param_name] = part
+            handler, p = self._match(child, parts[1:], new_params)
+            if handler:
+                return handler, p
+            
+        return None, {}
+
+    def handle(self, request: NKRequest):
+        method = request.method.upper()
+        path_parts = request.path.strip("/").split("/")
+        if method not in self.routes:
+            return NKResponse(body="404 Not Found", status=404)
+        
+        handler, params = self._match(self.routes[method], path_parts, {})
+        if handler:
+            request.params = params
             try:
                 return handler(request)
             except Exception as error:
                 traceback.print_exception(error)
-                return NKResponse(data="500 Internal Server Error", status=500)
+                return NKResponse(body="500 Internal Server Error", status=500)
             
-        return NKResponse(data="404 Not Found", status=404)
+        return NKResponse(body="404 Not Found", status=404)
