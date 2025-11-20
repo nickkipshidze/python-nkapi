@@ -1,15 +1,17 @@
 import json
 
 class NKResponse:
-    def __init__(self, headers=None, data="", status=200):
+    def __init__(self, headers=None, body="", status=200):
         self.headers = headers or {}
-        self.data = data
+        self.body = body
         self.status = status
 
-        if self.headers.get("Content-Type") == "application/json" and isinstance(self.data, dict):
-            self.data = json.dumps(self.data)
+        if "application/json" in self.headers.get("Content-Type", "").lower() and isinstance(self.body, (dict, list, tuple)):
+            self.body = json.dumps(self.body, indent=4)
 
-        if isinstance(self.data, str):
-            self.data = self.data.encode("utf-8")
+        if not isinstance(self.body, bytes):
+            if not "Content-Type" in self.headers:
+                self.headers["Content-Type"] = "text/plain; charset=utf-8"
+            self.body = self.body.encode("utf-8")
         
-        self.headers["Content-Length"] = len(self.data)
+        self.headers["Content-Length"] = str(len(self.body))
