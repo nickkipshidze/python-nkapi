@@ -1,6 +1,6 @@
 import datetime
 import http.server
-import urllib.parse
+import http.client
 
 from . import __version__
 from .request import NKRequest
@@ -15,19 +15,7 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
         super().__init__(*args, **kwargs)
 
     def handle_request(self):
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8") if length > 0 else None
-
-        parsed = urllib.parse.urlparse(self.path)
-
-        request = NKRequest(
-            method=self.command,
-            path=parsed.path,
-            query=urllib.parse.parse_qs(parsed.query),
-            headers=dict(self.headers),
-            body=body
-        )
-
+        request = NKRequest.from_handler(self)
         response = self.router.handle(request)
         self.respond(response)
     
@@ -46,7 +34,8 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_header(header, value)
         self.end_headers()
 
-        self.wfile.write(response.data)
+        if self.command != "HEAD":
+            self.wfile.write(response.body)
     
     def log_message(self, format, *args):
         timestamp = datetime.datetime.now().strftime("%I:%M:%S %p %m/%d/%Y")
@@ -54,10 +43,11 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
         method = getattr(self, "command", None)
         path = getattr(self, "path", None)
         version = getattr(self, "request_version", None)
+        status = args[1] if len(args) > 1 else "-"
 
         print(
             f"{self.client_address[0]} - - [{timestamp}] "
-            f"\"{method} {path} {version}\" {args[1]} -"
+            f"\"{method} {path} {version}\" {status} -"
         )
 
 class NKServer:
@@ -79,10 +69,10 @@ class NKServer:
             headers = [(k, str(v)) for k, v in response.headers.items()]
             start_response(status_line, headers)
 
-            if isinstance(response.data, str):
-                response.data = response.data.encode("utf-8")
+            if isinstance(response.body, str):
+                response.body = response.body.encode("utf-8")
                 
-            return [response.data]
+            return [response.body]
         return app
 
     def start(self):
