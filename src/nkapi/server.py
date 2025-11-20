@@ -50,9 +50,16 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
     
     def log_message(self, format, *args):
         timestamp = datetime.datetime.now().strftime("%I:%M:%S %p %m/%d/%Y")
-        print(f"{self.client_address[0]} - - [{timestamp}] \"{self.command} {self.path} {self.request_version}\" {args[1]} -")
+        
+        method = getattr(self, "command", None)
+        path = getattr(self, "path", None)
+        version = getattr(self, "request_version", None)
 
-    
+        print(
+            f"{self.client_address[0]} - - [{timestamp}] "
+            f"\"{method} {path} {version}\" {args[1]} -"
+        )
+
 class NKServer:
     def __init__(self, host="127.0.0.1", port=8000, debug=True):
         self.host = host
@@ -71,7 +78,11 @@ class NKServer:
             status_line = f"{response.status} {http.client.responses.get(response.status, "")}"
             headers = [(k, str(v)) for k, v in response.headers.items()]
             start_response(status_line, headers)
-            return [response.data.encode("utf-8")]
+
+            if isinstance(response.data, str):
+                response.data = response.data.encode("utf-8")
+                
+            return [response.data]
         return app
 
     def start(self):
