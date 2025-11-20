@@ -1,3 +1,4 @@
+import json
 import nkapi
 
 server = nkapi.NKServer(
@@ -8,9 +9,9 @@ server = nkapi.NKServer(
 app = server.wsgi_app
 
 def root(request: nkapi.NKRequest):
-    return nkapi.NKResponse(
+    response = nkapi.NKResponse(
         headers={"Content-Type": "application/json"},
-        data={
+        body={
             "method": request.method,
             "path": request.path,
             "query": request.query,
@@ -19,11 +20,18 @@ def root(request: nkapi.NKRequest):
         }
     )
 
-server.router.register(
-    methods=["GET", "POST"],
-    path="/",
-    callback=root
-)
+    # Hacky response body modification to return the response within the response body
+    response.body = "Request:\n" + response.body.decode() + "\n\nResponse:\n" + json.dumps({
+        "status": response.status,
+        "headers": response.headers,
+        "body": response.body.decode()
+    }, indent=4)
+    response.body = response.body.encode("utf-8")
+    response.headers["Content-Length"] = str(len(response.body))
+
+    return response
+
+server.router.register(methods=["GET", "POST"], path="/", callback=root)
 
 if __name__ == "__main__":
     server.start()
