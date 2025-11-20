@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nkapi"
-version = "0.1.0"
+version = "0.1.1"
 description = "A lightweight general purpose API framework. Designed to make getting started quick and easy."
 keywords = ["nkapi", "kapi", "flask", "django", "api framework"]
 readme = "README.md"
@@ -14,11 +14,19 @@ authors = [
     { name = "Nick Kipshidze", email = "kipshidze.nick@gmail.com" }
 ]
 maintainers = [
-    { name = "Nick Kipshidze", email = "kipshidze.nick@gmail.com" }
+    { name = "Nick Kipshidze", email = "kipshidze.nick@gmail.com" },
+    { name = "George Kandelaki", email = "kandelakig29@gmail.com" }
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Programming Language :: Python"
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Internet :: WWW/HTTP :: WSGI",
+    "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+    "Topic :: Software Development :: Libraries :: Application Frameworks"
 ]
 requires-python = ">=3.8"
 
