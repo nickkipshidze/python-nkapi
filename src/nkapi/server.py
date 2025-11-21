@@ -29,13 +29,11 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def respond(self, response: NKResponse):
         self.send_response(response.status)
-        
+        body = response.body
         for header, value in response.headers.items():
             self.send_header(header, value)
         self.end_headers()
-
-        if self.command != "HEAD":
-            self.wfile.write(response.body)
+        self.wfile.write(body)
     
     def log_message(self, format, *args):
         timestamp = datetime.datetime.now().strftime("%I:%M:%S %p %m/%d/%Y")
@@ -71,8 +69,8 @@ class NKServer:
 
             if isinstance(response.body, str):
                 response.body = response.body.encode("utf-8")
-                
-            return [response.body]
+            
+            return [response.body] if environ.get("REQUEST_METHOD", "GET") != "HEAD" else []
         return app
 
     def start(self):

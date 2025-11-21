@@ -1,6 +1,8 @@
 import json
 import urllib.parse
 
+from .response import NKHeaders
+
 class NKRequest:
     def __init__(self, method, path, query=None, headers=None, body=None, client_address=None):
         self.method = method
@@ -8,7 +10,7 @@ class NKRequest:
         query = query or {}
         self.query = {k: v[0] if len(v) == 1 else v for k, v in query.items()}
         self.params = {}
-        self.headers = headers or {}
+        self.headers = NKHeaders(headers or {})
         self.body = body
         self.client_address = client_address
 
@@ -20,8 +22,12 @@ class NKRequest:
                 
     @classmethod
     def from_handler(cls, handler):
-        length = int(handler.headers.get("Content-Length", 0))
-        body = handler.rfile.read(length).decode("utf-8") if length > 0 else None
+        try:
+            length = int(handler.headers.get("Content-Length", 0))
+        except (ValueError, TypeError):
+            length = 0
+            
+        body = handler.rfile.read(length).decode("utf-8", errors="ignore") if length > 0 else None
         parsed = urllib.parse.urlparse(handler.path)
         
         return cls(
@@ -48,7 +54,8 @@ class NKRequest:
             length = int(environ.get("CONTENT_LENGTH", 0))
         except (ValueError, TypeError):
             length = 0
-        body = environ["wsgi.input"].read(length).decode("utf-8") if length > 0 else None
+
+        body = environ["wsgi.input"].read(length).decode("utf-8", errors="ignore") if length > 0 else None
 
         return cls(
             method=environ.get("REQUEST_METHOD", "GET"),
