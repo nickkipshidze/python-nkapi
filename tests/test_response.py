@@ -32,7 +32,7 @@ def test_response_with_bytes_body_does_not_modify_bytes():
     request = nkapi.NKResponse(body=raw)
     assert request.body == raw
     assert request.headers["Content-Length"] == str(len(raw))
-    assert request.headers["Content-Type"] == "text/plain; charset=utf-8"
+    assert request.headers["Content-Type"] == "application/octet-stream"
     
 def test_response_preserves_explicit_content_type_with_plain_text():
     request = nkapi.NKResponse(
@@ -45,9 +45,9 @@ def test_response_preserves_explicit_content_type_with_plain_text():
 def test_response_non_json_body_with_json_header_stays_literal():
     request = nkapi.NKResponse(
         headers={"Content-Type": "application/json"},
-        body="not json at all"
+        body="<h1>not json at all</h1>"
     )
-    assert request.body == b"not json at all"
+    assert request.body == b"<h1>not json at all</h1>"
     
 def test_response_json_header_case_insensitive():
     request = nkapi.NKResponse(

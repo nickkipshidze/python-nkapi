@@ -1,7 +1,7 @@
 import nkapi
 
 def default_callback(request):
-    return {"ok": True, "params": request.params if request else None}
+    return {"ok": True, "params": request.params if request else {}}
     
 def test_root_route_matches_and_unknown_path_returns_not_found():
     router = nkapi.NKRouter()
