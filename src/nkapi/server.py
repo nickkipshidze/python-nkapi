@@ -3,15 +3,16 @@ import http.server
 import http.client
 
 from . import __version__
-from .request import NKRequest
-from .response import NKResponse
+from . import utils
+from .messages import NKRequest, NKResponse
 from .router import NKRouter
 
 class NKRequestHandler(http.server.BaseHTTPRequestHandler):
     server_version = f"NKAPI/{__version__}"
 
-    def __init__(self, router, *args, **kwargs):
+    def __init__(self, router, debug=False, *args, **kwargs):
         self.router = router
+        self.debug = debug
         super().__init__(*args, **kwargs)
 
     def handle_request(self):
@@ -34,8 +35,8 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_header(header, value)
         self.end_headers()
         self.wfile.write(body)
-    
-    def log_message(self, format, *args):
+
+    def log_message(self, format, *args):        
         timestamp = datetime.datetime.now().strftime("%I:%M:%S %p %m/%d/%Y")
         
         method = getattr(self, "command", None)
@@ -43,19 +44,26 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
         version = getattr(self, "request_version", None)
         status = args[1] if len(args) > 1 else "-"
 
+        a = utils.ANSI
+        color = {
+            "2": a.WHITE, "3": a.CYAN, "4": a.YELLOW, "5": a.MAGENTA
+        }.get(str(status)[0], "")
+
         print(
             f"{self.client_address[0]} - - [{timestamp}] "
-            f"\"{method} {path} {version}\" {status} -"
+            f"\"{color}{method} {path} {version}{a.RESET}\" {status} -"
         )
 
 class NKServer:
     def __init__(self, host="127.0.0.1", port=8000, debug=True):
         self.host = host
-        self.port = port
+        self.port = port if port != 0 else utils.get_free_port(self.host)
         self.debug = bool(debug)
 
-        self.router = NKRouter()
-        self.handler = lambda *args, **kwargs: NKRequestHandler(self.router, *args, **kwargs)
+        self.router = NKRouter(debug=self.debug)
+        self.handler = lambda *args, **kwargs: NKRequestHandler(
+            self.router, self.debug, *args, **kwargs
+        )
 
     @property
     def wsgi_app(self):
@@ -76,8 +84,16 @@ class NKServer:
     def start(self):
         print(
             "* Serving NKAPI app",
-            f"* Debug mode: {self.debug}",
+            f"* Debug mode: {['off', 'on'][int(self.debug)]}",
+            sep="\n"
+        )
+
+        if self.debug:
+            print(f"{utils.ANSI.RED}* WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.{utils.ANSI.RESET}")
+
+        print(
             f"* Running on http://{self.host}:{self.port}/",
+            f"{utils.ANSI.YELLOW}* Press CTRL+C to quit{utils.ANSI.RESET}",
             sep="\n"
         )
 
@@ -89,6 +105,6 @@ class NKServer:
         try:
             self.httpd.serve_forever()
         except KeyboardInterrupt:
-            print("* Closing the server...")
+            print("\n* Closing the server...")
             self.httpd.server_close()
             exit(0)
