@@ -1,8 +1,8 @@
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
-from .request import NKRequest
-from .response import NKResponse
+from .messages import NKRequest, NKResponse
 from .router import NKRouter
 from .server import NKServer, NKRequestHandler
+from .database import NKDBSqlite3
 
-__all__ = ["NKRequest", "NKResponse", "NKRouter", "NKServer", "NKRequestHandler"]
+__all__ = ["NKRequest", "NKResponse", "NKRouter", "NKServer", "NKRequestHandler", "NKDBSqlite3"]
