@@ -1,7 +1,6 @@
 import traceback
 
-from .request import NKRequest
-from .response import NKResponse
+from .messages import NKRequest, NKResponse
 
 class RouteNode:
     def __init__(self):
@@ -10,10 +9,11 @@ class RouteNode:
         self.param_name = None
 
 class NKRouter:
-    def __init__(self):
+    def __init__(self, debug=False):
         self.routes = {}
+        self.debug = debug
     
-    def register(self, methods, path, callback):
+    def register(self, methods, path, view):
         parts = path.strip("/").split("/")
         for method in methods:
             method = method.upper()
@@ -34,7 +34,7 @@ class NKRouter:
                         node.children[part] = RouteNode()
                     node = node.children[part]
 
-            node.handler = callback
+            node.handler = view
 
     def _match(self, node: RouteNode, parts, params):
         if not parts:
@@ -68,7 +68,11 @@ class NKRouter:
             try:
                 return handler(request)
             except Exception as error:
-                traceback.print_exception(error)
-                return NKResponse(body="500 Internal Server Error", status=500)
+                if self.debug:
+                    tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+                    return NKResponse(body=tb, status=500)
+                else:
+                    traceback.print_exception(error)
+                    return NKResponse(body="500 Internal Server Error", status=500)
             
         return NKResponse(body="404 Not Found", status=404)
