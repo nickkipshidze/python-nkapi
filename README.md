@@ -2,7 +2,7 @@
 
 A lightweight general-purpose API framework for Python. Designed to make getting started quick and easy, NKAPI is inspired by Flask and Django but keeps things minimal and straightforward.  
 
-**Version:** 0.1.2
+**Version:** 0.2.0
 
 ## Installation
 
@@ -28,7 +28,7 @@ Here’s a minimal example of using NKAPI:
 import nkapi
 
 server = nkapi.NKServer(
-    host="0.0.0.0",
+    host="127.0.0.1",
     port=8000
 )
 
@@ -37,7 +37,7 @@ app = server.wsgi_app
 def root(request: nkapi.NKRequest):
     return nkapi.NKResponse(
         headers={"Content-Type": "application/json"},
-        data={
+        body={
             "method": request.method,
             "path": request.path,
             "query": request.query,
@@ -46,7 +46,7 @@ def root(request: nkapi.NKRequest):
         }
     )
 
-server.router.register(methods=["GET", "POST"], path="/", callback=root)
+server.router.register(methods=["GET", "POST"], path="/", view=root)
 
 if __name__ == "__main__":
     server.start()
