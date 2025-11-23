@@ -29,7 +29,15 @@ def root(request: nkapi.NKRequest):
 
     return response
 
-server.router.register(methods=["GET", "POST"], path="/", callback=root)
+def status(request: nkapi.NKRequest):
+    code = request.params["code"]
+    return nkapi.NKResponse(
+        body=f"status code {code}",
+        status=int(code)
+    )
+
+server.router.register(methods=["GET", "POST"], path="/", view=root)
+server.router.register(methods=["GET", "POST"], path="/status/<code>", view=status)
 
 if __name__ == "__main__":
     server.start()
