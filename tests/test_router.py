@@ -22,13 +22,13 @@ def test_path_normalization_resolves_to_root_or_registered_route():
     assert router.handle(nkapi.NKRequest("GET", "/../..")) == default_view(None)
     assert router.handle(nkapi.NKRequest("GET", "/test")) == default_view(None)
 
-def test_method_mismatch_returns_not_found():
+def test_method_mismatch_returns_not_allowed():
     router = nkapi.NKRouter()
     router.register(methods=["GET"], path="/item", view=default_view)
 
     response = router.handle(nkapi.NKRequest("POST", "/item"))
     assert hasattr(response, "status")
-    assert response.status == 404
+    assert response.status == 405
     
 def test_multiple_methods_route_matches_correctly():
     router = nkapi.NKRouter()
@@ -36,7 +36,7 @@ def test_multiple_methods_route_matches_correctly():
 
     assert router.handle(nkapi.NKRequest("GET", "/multi")) == default_view(None)
     assert router.handle(nkapi.NKRequest("POST", "/multi")) == default_view(None)
-    assert router.handle(nkapi.NKRequest("PUT", "/multi")).status == 404
+    assert router.handle(nkapi.NKRequest("PUT", "/multi")).status == 405
     
 def test_trailing_slashes_do_not_break_routing():
     router = nkapi.NKRouter()
@@ -120,7 +120,7 @@ def test_multiple_methods_on_dynamic_route_dispatch_correctly():
     assert post_r["params"]["pk"] == "alpha"
 
     fail = router.handle(nkapi.NKRequest("PUT", "/item/alpha"))
-    assert fail.status == 404
+    assert fail.status == 405
     
 def test_dynamic_route_normalization_of_slashes():
     router = nkapi.NKRouter()
