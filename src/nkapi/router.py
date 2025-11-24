@@ -36,6 +36,15 @@ class NKRouter:
 
             node.handler = view
 
+    def allowed_methods(self, path):
+        path_parts = path.strip("/").split("/")
+        allowed = []
+        for method, root in self.routes.items():
+            handler, _ = self._match(root, path_parts, {})
+            if handler:
+                allowed.append(method)
+        return allowed
+
     def _match(self, node: RouteNode, parts, params):
         if not parts:
             return (node.handler, params) if node.handler else (None, {})
@@ -59,20 +68,27 @@ class NKRouter:
     def handle(self, request: NKRequest):
         method = request.method.upper()
         path_parts = request.path.strip("/").split("/")
-        if method not in self.routes:
-            return NKResponse(body="404 Not Found", status=404)
-        
-        handler, params = self._match(self.routes[method], path_parts, {})
-        if handler:
-            request.params = params
-            try:
-                return handler(request)
-            except Exception as error:
-                if self.debug:
-                    tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-                    return NKResponse(body=tb, status=500)
-                else:
-                    traceback.print_exception(error)
-                    return NKResponse(body="500 Internal Server Error", status=500)
+
+        if method in self.routes:
+            handler, params = self._match(self.routes[method], path_parts, {})
+            if handler:
+                request.params = params
+                try:
+                    return handler(request)
+                except Exception as error:
+                    if self.debug:
+                        tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+                        return NKResponse(body=tb, status=500)
+                    else:
+                        traceback.print_exception(error)
+                        return NKResponse(body="500 Internal Server Error", status=500)
+            
+        allowed = self.allowed_methods(request.path)
+        if allowed:
+            return NKResponse(
+                headers={"Allow": ", ".join(allowed)},
+                body="405 Method Not Allowed",
+                status=405
+            )
             
         return NKResponse(body="404 Not Found", status=404)
