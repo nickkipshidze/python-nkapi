@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nkapi"
-version = "0.2.0"
+version = "0.2.1"
 description = "A lightweight general purpose API framework. Designed to make getting started quick and easy."
-keywords = ["nkapi", "kapi", "flask", "django", "api framework"]
+keywords = ["nkapi", "kapi", "flask", "django", "api framework", "python api", "rest api", "web framework", "wsgi", "sqlite", "microframework", "server", "http", "backend", "minimal", "lightweight"]
 readme = "README.md"
 license = "MIT"
 license-files = ["LICEN[CS]E.*"]

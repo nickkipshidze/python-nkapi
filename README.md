@@ -2,7 +2,7 @@
 
 A lightweight general-purpose API framework for Python. Designed to make getting started quick and easy, NKAPI is inspired by Flask and Django but keeps things minimal and straightforward.  
 
-**Version:** 0.2.0
+**Version:** 0.2.1
 
 ## Installation
 
