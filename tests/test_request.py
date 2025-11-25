@@ -187,3 +187,97 @@ def test_request_str_and_repr_survive_weird_values():
     request = nkapi.NKRequest(method=None, path=None)
     assert "None" in str(request)
     assert str(request) == repr(request)
+
+def test_request_with_nonstandard_method_and_path_characters():
+    request = nkapi.NKRequest(method="GE T", path="/weird path/💀🔥")
+    assert request.method == "GE T"
+    assert request.path == "/weird path/💀🔥"
+
+def test_request_query_keys_with_empty_lists_and_nested_empty_lists():
+    request = nkapi.NKRequest(method="GET", path="/", query={"a": [], "b": [[]], "c": ["val"]})
+    assert request.query == {"a": [], "b": [[]], "c": "val"}
+
+def test_request_with_headers_containing_non_ascii_and_mixed_case():
+    request = nkapi.NKRequest(method="GET", path="/", headers={"X-Ünicode": "✓", "x-Mixed": "VaLue"})
+    assert request.headers["X-Ünicode"] == "✓"
+    assert request.headers["X-Mixed"] == "VaLue"
+
+def test_request_with_body_as_integer_or_non_string_non_bytes_values():
+    request = nkapi.NKRequest(method="POST", path="/", body=12345)
+    assert request.body == 12345
+
+def test_request_from_handler_reads_partial_body_if_content_length_smaller():
+    class Dummy:
+        def __init__(self):
+            self.command = "POST"
+            self.path = "/partial"
+            self.headers = {"Content-Length": "4", "Content-Type": "text/plain"}
+            self.rfile = io.BytesIO(b"abcdef")
+            self.client_address = ("1.2.3.4", 80)
+
+    request = nkapi.NKRequest.from_handler(Dummy())
+    assert request.body == "abcd"
+
+def test_request_from_handler_with_missing_rfile_does_not_crash():
+    class Dummy:
+        def __init__(self):
+            self.command = "GET"
+            self.path = "/"
+            self.headers = {}
+            self.client_address = ("0.0.0.0", 0)
+            self.rfile = None
+
+    request = nkapi.NKRequest.from_handler(Dummy())
+    assert request.body is None
+
+def test_request_from_environ_with_missing_wsgi_input_returns_none():
+    environ = {"REQUEST_METHOD": "GET", "PATH_INFO": "/"}
+    request = nkapi.NKRequest.from_environ(environ)
+    assert request.body is None
+
+def test_request_body_with_invalid_utf8_bytes_does_not_crash():
+    body = b"\xff\xfe\xfd"
+    request = nkapi.NKRequest(method="POST", path="/", body=body, headers={"Content-Type": "application/json"})
+    assert request.body == body
+
+def test_request_query_with_encoded_unicode_and_percent_signs():
+    request = nkapi.NKRequest(method="GET", path="/", query={"q": ["%F0%9F%98%81", "%25"]})
+    assert request.query == {"q": ["%F0%9F%98%81", "%25"]}
+
+def test_request_with_multiple_content_type_headers_prioritizes_last():
+    request = nkapi.NKRequest(method="GET", path="/", headers={"Content-Type": "text/plain", "CONTENT-TYPE": "application/json"}, body='{"x":1}')
+    assert isinstance(request.body, dict)
+    assert request.body == {"x": 1}
+
+def test_request_from_environ_with_non_integer_content_length_reads_none():
+    environ = {"REQUEST_METHOD": "POST", "PATH_INFO": "/", "CONTENT_LENGTH": "abc", "wsgi.input": io.BytesIO(b"xyz")}
+    request = nkapi.NKRequest.from_environ(environ)
+    assert request.body is None
+
+def test_request_from_environ_with_missing_content_type_assumes_bytes():
+    body = "hello"
+    environ = {"REQUEST_METHOD": "POST", "PATH_INFO": "/", "CONTENT_LENGTH": str(len(body)), "wsgi.input": io.BytesIO(body.encode())}
+    request = nkapi.NKRequest.from_environ(environ)
+    assert request.body == body
+
+def test_request_with_large_binary_body_and_json_content_type_safe_handling():
+    giant = b"x" * 5_000_000
+    request = nkapi.NKRequest(method="POST", path="/big", headers={"Content-Type": "application/json"}, body=giant)
+    assert request.body == giant
+
+def test_request_with_headers_containing_non_string_values_converted_to_string():
+    request = nkapi.NKRequest(method="GET", path="/", headers={"X-Number": 123, "X-None": None})
+    assert request.headers["X-Number"] == "123"
+    assert request.headers["X-None"] == "None"
+
+def test_request_with_body_as_list_or_dict_returns_as_is():
+    body = {"a": 1}
+    request = nkapi.NKRequest(method="POST", path="/", body=body)
+    assert request.body == body
+    body_list = [1, 2, 3]
+    request_list = nkapi.NKRequest(method="POST", path="/", body=body_list)
+    assert request_list.body == body_list
+
+def test_request_with_multiple_query_values_same_key_preserves_list_when_needed():
+    request = nkapi.NKRequest(method="GET", path="/", query={"x": ["1", "2"], "y": ["single"]})
+    assert request.query == {"x": ["1", "2"], "y": "single"}

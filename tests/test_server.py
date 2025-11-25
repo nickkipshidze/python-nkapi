@@ -181,3 +181,73 @@ def test_wsgi_malformed_query_string():
     status, headers, body = run_wsgi_app(server.wsgi_app, "GET", "/fail", query="=1&?x&&y=2")
     text = body.decode("utf-8")
     assert isinstance(text, str)
+
+def test_wsgi_method_not_allowed_returns_405():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/onlyget", lambda r: nkapi.NKResponse(body="ok"))
+
+    status, headers, body = run_wsgi_app(server.wsgi_app, "POST", "/onlyget")
+    assert status.startswith("405")
+    assert b"" == body or b"405" in body
+
+def test_wsgi_redirect_response():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/old", lambda r: nkapi.NKResponse(status=302, headers={"Location": "/new"}))
+
+    status, headers, body = run_wsgi_app(server.wsgi_app, "GET", "/old")
+    assert status.startswith("302")
+    assert headers["Location"] == "/new"
+
+def test_wsgi_custom_status_code_and_message():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/custom", lambda r: nkapi.NKResponse(status=418, body="I'm a teapot"))
+
+    status, headers, body = run_wsgi_app(server.wsgi_app, "GET", "/custom")
+    assert status.startswith("418")
+    assert body == b"I'm a teapot"
+
+def test_wsgi_empty_body_and_headers():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/empty", lambda r: nkapi.NKResponse())
+
+    status, headers, body = run_wsgi_app(server.wsgi_app, "GET", "/empty")
+    assert status.startswith("200")
+    assert body == b""
+    assert isinstance(headers, dict)
+
+def test_wsgi_content_length_is_set_automatically():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/auto", lambda r: nkapi.NKResponse(body="hello"))
+
+    status, headers, body = run_wsgi_app(server.wsgi_app, "GET", "/auto")
+    assert headers.get("Content-Length") == str(len(body))
+
+def test_wsgi_query_parameters_with_special_characters():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/special",
+        lambda r: nkapi.NKResponse(body=str(r.query))
+    )
+
+    status, headers, body = run_wsgi_app(server.wsgi_app, "GET", "/special", query="param=hello%20world&emoji=%F0%9F%98%81")
+    text = body.decode()
+    assert "hello world" in text
+    assert "😁" in text
+
+def test_wsgi_large_headers_do_not_break_server():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/headers", lambda r: nkapi.NKResponse(body=r.headers.get("X-Large")))
+
+    large_value = "x" * 10_000
+    status, headers, body = run_wsgi_app(server.wsgi_app, "GET", "/headers", headers={"X-Large": large_value})
+    assert body.decode() == large_value
+
+def test_wsgi_multiple_routes_same_path_different_methods():
+    server = nkapi.NKServer()
+    server.router.register(["GET"], "/multi", lambda r: nkapi.NKResponse(body="get"))
+    server.router.register(["POST"], "/multi", lambda r: nkapi.NKResponse(body="post"))
+
+    status_get, _, body_get = run_wsgi_app(server.wsgi_app, "GET", "/multi")
+    status_post, _, body_post = run_wsgi_app(server.wsgi_app, "POST", "/multi")
+    
+    assert body_get == b"get"
+    assert body_post == b"post"

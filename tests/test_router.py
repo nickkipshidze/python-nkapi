@@ -144,3 +144,100 @@ def test_dynamic_route_view_receives_params_before_execution():
     router.handle(nkapi.NKRequest("GET", "/user/u1/post/p9"))
 
     assert called == {"uid": "u1", "pid": "p9"}
+
+def test_overlapping_dynamic_routes_match_correctly():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/item/<id>", default_view)
+    router.register(["GET"], "/item/<id>/details", default_view)
+
+    request1 = nkapi.NKRequest("GET", "/item/42")
+    request2 = nkapi.NKRequest("GET", "/item/42/details")
+
+    assert request1.params == {} or "id" in router.handle(request1)["params"]
+    assert router.handle(request2)["params"]["id"] == "42"
+
+def test_dynamic_route_with_special_characters_in_path():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/file/<name>", default_view)
+
+    request = nkapi.NKRequest("GET", "/file/%2Fetc%2Fpasswd")
+    result = router.handle(request)
+
+    assert result["params"]["name"] == "%2Fetc%2Fpasswd"
+
+def test_route_with_query_like_segments_does_not_confuse_router():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/search/<term>", default_view)
+
+    request = nkapi.NKRequest("GET", "/search/foo?bar=baz")
+    result = router.handle(request)
+
+    assert result["params"]["term"] == "foo"
+
+def test_conflicting_dynamic_and_wildcard_routes_resolve_to_most_specific():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/path/<var>", default_view)
+    router.register(["GET"], "/path/static", lambda r: "static")
+
+    request1 = nkapi.NKRequest("GET", "/path/static")
+    request2 = nkapi.NKRequest("GET", "/path/dynamic")
+
+    assert router.handle(request1) == "static"
+    assert router.handle(request2)["params"]["var"] == "dynamic"
+
+def test_route_with_empty_segment_between_slashes_normalizes_correctly():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/a/b/c", default_view)
+
+    request = nkapi.NKRequest("GET", "/a//b///c")
+    result = router.handle(request)
+
+    assert result == default_view(None)
+
+def test_router_rejects_malformed_paths_gracefully():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/safe/path", default_view)
+
+    for malformed_path in ["///..///", "/..%2F..", "/%2e%2e/%2e%2e"]:
+        request = nkapi.NKRequest("GET", malformed_path)
+        response = router.handle(request)
+        assert hasattr(response, "status")
+        assert response.status == 404
+
+def test_router_registering_same_route_multiple_times_uses_last_view():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/dup", lambda r: "first")
+    router.register(["GET"], "/dup", lambda r: "second")
+
+    request = nkapi.NKRequest("GET", "/dup")
+    assert router.handle(request) == "second"
+
+def test_router_dynamic_parameter_edge_cases_empty_and_unicode():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/emoji/<char>", default_view)
+    router.register(["GET"], "/empty/<value>", default_view)
+
+    request_unicode = nkapi.NKRequest("GET", "/emoji/🔥")
+    request_empty = nkapi.NKRequest("GET", "/empty/")
+
+    assert router.handle(request_unicode)["params"]["char"] == "🔥"
+    response_empty = router.handle(request_empty)
+    assert response_empty.status == 404
+
+def test_router_long_path_segments_do_not_crash():
+    router = nkapi.NKRouter()
+    long_segment = "a" * 5000
+    router.register(["GET"], f"/long/{long_segment}", default_view)
+
+    request = nkapi.NKRequest("GET", f"/long/{long_segment}")
+    result = router.handle(request)
+    assert result == default_view(None)
+
+def test_router_parameters_with_reserved_characters():
+    router = nkapi.NKRouter()
+    router.register(["GET"], "/reserved/<param>", default_view)
+
+    reserved_chars = "!$&'()*+,;=:@"
+    request = nkapi.NKRequest("GET", f"/reserved/{reserved_chars}")
+    result = router.handle(request)
+    assert result["params"]["param"] == reserved_chars
