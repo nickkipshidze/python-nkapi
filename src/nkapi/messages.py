@@ -26,9 +26,9 @@ class NKHeaders(dict):
         return value
 
 class NKResponse:
-    def __init__(self, headers=None, body="", status=200):
+    def __init__(self, headers=None, body=None, status=200):
         self.headers = NKHeaders(headers or {})
-        self._body = body
+        self._body = body or ""
         self.status = status
 
         if "Content-Type" not in self.headers:
@@ -50,7 +50,7 @@ class NKResponse:
                 body = json.dumps(body, indent=4)
 
         if not isinstance(body, bytes):
-            body = body.encode("utf-8", errors="ignore")
+            body = str(body).encode("utf-8", errors="ignore")
 
         self.headers["Content-Length"] = len(body)
 

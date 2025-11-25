@@ -76,11 +76,11 @@ class NKRouter:
                 try:
                     return handler(request)
                 except Exception as error:
+                    traceback.print_exception(error)
                     if self.debug:
                         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
                         return NKResponse(body=tb, status=500)
                     else:
-                        traceback.print_exception(error)
                         return NKResponse(body="500 Internal Server Error", status=500)
             
         allowed = self.allowed_methods(request.path)

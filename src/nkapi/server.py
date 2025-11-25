@@ -146,7 +146,7 @@ class NKServer:
             sep="\n"
         )
 
-        self.httpd = http.server.HTTPServer(
+        self.httpd = http.server.ThreadingHTTPServer(
             (self.host, self.port),
             self.handler
         )
