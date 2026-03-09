@@ -64,7 +64,6 @@ class NKRequestHandler(http.server.BaseHTTPRequestHandler):
             status=200,
             headers={
                 "Content-Type": "text/plain",
-                "Access-Control-Allow-Origin": origin if origin else "",
                 "Access-Control-Allow-Methods": allow_methods,
                 "Access-Control-Allow-Headers": allow_headers,
                 "Vary": "Origin"

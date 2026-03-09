@@ -152,7 +152,7 @@ class NKDBSqlite3:
             self.execute(query, values, commit=commit)
             return self.cursor.lastrowid
 
-    def update(self, table_name, updates, where=None, where_params=None, commit=True):
+    def update(self, table_name, updates, where=None, params=None, commit=True):
         with self.lock:
             self._ensure_open()
             set_clause = ", ".join([f"{self._quote_identifier(k)} = ?" for k in updates.keys()])
@@ -160,7 +160,7 @@ class NKDBSqlite3:
             query = f"UPDATE {self._quote_identifier(table_name)} SET {set_clause}"
             if where:
                 query += f" WHERE {where}"
-                params = update_values + (where_params or ())
+                params = update_values + (params or ())
             else:
                 params = update_values
             query += ";"
